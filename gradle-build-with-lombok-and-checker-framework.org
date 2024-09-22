@@ -1,0 +1,179 @@
+#+title: Gradle Build With Lombok And Checker Framework
+
+* A gradle build with Lombok and Checker Framework
+
+*NOTE*: The delombok plugin for maven is unmaintained, and making the delombok
+process work with the Checker Framework gets more complicated. Therefore, it
+makes sense to have a build working with gradle instead. The gradle plugins used
+here play well together and are maintained.
+
+Once we have [[https://github.com/typetools/jdk17u][typetools/jdk17u]] built and ready for our OS (to get the most of the
+Checker Framework), the following ~build.gradle~ can be useful to apply:
+1. Java Google code rules
+2. Lombok/delombok with [[https://plugins.gradle.org/plugin/io.freefair.lombok][io.freefair.lombok]] gradle plugin.
+3. [[https://checkerframework.org][Checker Framework]] checkers (e.g. ~NullnessChecker~).
+
+#+begin_src groovy
+plugins {
+    id 'java'
+    id 'com.github.ben-manes.versions' version '0.51.0'
+    id 'io.freefair.lombok' version '6.3.0'
+    id 'org.checkerframework' version '0.6.44'
+    id 'com.diffplug.spotless' version "7.0.0.BETA2"
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.functionaljava:functionaljava:5.0'
+    implementation 'com.google.guava:guava:33.3.0-jre'
+    implementation 'ch.qos.logback:logback-classic:1.5.8'
+    implementation 'org.slf4j:slf4j-api:2.1.0-alpha1'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.0-rc1'
+    implementation 'com.opencsv:opencsv:5.9'
+
+    compileOnly 'org.checkerframework:checker-qual:3.47.0'
+    testCompileOnly 'org.checkerframework:checker-qual:3.47.0'
+    checkerFramework 'org.checkerframework:checker:3.47.0'
+    implementation 'org.checkerframework:checker-util:3.47.0'
+
+    testImplementation 'org.testng:testng:7.10.2'
+    testImplementation 'org.assertj:assertj-core:3.26.3'
+
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    // compileOnly 'org.projectlombok:lombok:1.18.22'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.addAll([
+            '--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED',
+            '--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
+            '--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED',
+            '--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED',
+            '--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED',
+            '--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED',
+            '--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+            '--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED',
+            '-Xmaxerrs', '10000',
+            '-Xmaxwarns', '10000',
+            '-Awarns'
+    ])
+}
+
+spotless {
+    java {
+        eclipse().configFile("${rootProject.projectDir}/eclipse-java-google-style.xml")
+        importOrder('','\\#')
+                   .wildcardsLast(false)
+                   .semanticSort()
+        removeUnusedImports()
+        formatAnnotations()
+    }
+}
+
+checkerFramework {
+    checkers = [
+        'org.checkerframework.checker.nullness.NullnessChecker'
+    ]
+}
+
+test {
+    useTestNG()
+    maxHeapSize = '8G'
+}
+
+wrapper {
+    gradleVersion = '7.3'
+}
+#+end_src
+
+The ~build.gradle~ above is compatible with Java 17, and the plugins are also
+compatible with JDK 17. Notice that we are using a JDK 17 compatible version of
+gradle as well.
+
+** Spotless
+
+To call spotless, use:
+#+begin_src shell
+./gradlew :spotlessApply
+#+end_src
+
+** (Trivial) example of NullnessChecker usage
+
+The following simple example is meant to check that the ~build.gradle~ is working
+for the NullnessChecker:
+
+#+begin_src java
+package org.example;
+
+import lombok.extern.java.Log;
+import org.checkerframework.checker.nullness.qual.NonNull;
+import org.testng.annotations.Test;
+
+@Log
+public class NullnessChecks {
+    @Test
+    public void nullCheckOnString() {
+        @NonNull String str = null;
+        log.info(String.format("%d", str.length()));
+    }
+}
+#+end_src
+
+Executing:
+#+begin_src shell
+./gradlew clean build
+#+end_src
+gives
+#+begin_src shell
+> Task :compileTestJava
+warning: [options] --add-opens has no effect at compile time
+...NullnessChecks.java:14: warning: [assignment] incompatible types in assignment.
+
+        String str = null;
+                     ^
+  found   : null (NullType)
+  required: @UnknownInitialization @NonNull String
+#+end_src
+
+We could also have written:
+#+begin_src java
+@Log
+public class NullnessChecks {
+    @Test
+    public void nullCheckOnString() {
+        String str = null;
+        log.info(String.format("%d", str.length()));
+    }
+}
+#+end_src
+that is, not writing the ~@NonNull~ annotation, because it is the default. In that
+case, trying to execute the ~test~ task would have given:
+#+begin_src shell
+./gradlew test
+
+> Task :compileTestJava
+...NullnessChecks.java:14: warning: [dereference.of.nullable] dereference of possibly-null reference str
+
+        log.info(String.format("%d", str.length()));
+                                     ^
+1 warning
+
+> Task :test FAILED
+
+Gradle suite > Gradle test > org.example.NullnessChecks > nullCheckOnString FAILED
+    java.lang.NullPointerException at NullnessChecks.java:14
+
+1 test completed, 1 failed
+#+end_src
