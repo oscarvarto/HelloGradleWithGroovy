@@ -1,13 +1,13 @@
 package org.example;
 
-import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 import org.testng.annotations.Test;
 
-@Log
-public class NullnessChecks {
+@Slf4j
+public class NullnessTest {
     @Test
     public void nullCheckOnString() {
         String str = null;
-        log.info(String.format("%d", str.length()));
+        // logger.info(String.format("%d", str.length()));
     }
 }

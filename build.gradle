@@ -1,9 +1,11 @@
 plugins {
-    id 'java'
     id 'com.github.ben-manes.versions' version '0.51.0'
-    id 'io.freefair.lombok' version '6.3.0'
+    id 'io.freefair.lombok' version '8.10'
     id 'org.checkerframework' version '0.6.44'
     id 'com.diffplug.spotless' version "7.0.0.BETA2"
+
+    id 'dev.clojurephant.clojure' version '0.8.0-beta.7'
+    id 'application'
 }
 
 group = 'org.example'
@@ -11,35 +13,52 @@ version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
+    maven {
+        name = 'clojars'
+        url = 'https://repo.clojars.org'
+    }
 }
 
 dependencies {
     implementation 'org.functionaljava:functionaljava:5.0'
-    implementation 'com.google.guava:guava:33.3.0-jre'
+    implementation 'com.google.guava:guava:33.3.1-jre'
     implementation 'ch.qos.logback:logback-classic:1.5.8'
     implementation 'org.slf4j:slf4j-api:2.1.0-alpha1'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.0-rc1'
-    implementation 'com.opencsv:opencsv:5.9'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.0'
 
     compileOnly 'org.checkerframework:checker-qual:3.47.0'
     testCompileOnly 'org.checkerframework:checker-qual:3.47.0'
     checkerFramework 'org.checkerframework:checker:3.47.0'
     implementation 'org.checkerframework:checker-util:3.47.0'
 
-    testImplementation 'org.testng:testng:7.7.0' // Compatible with gradle 7.3
+    testImplementation 'org.testng:testng:7.10.2' // Compatible with gradle 7.3, 7.7.0
     testImplementation 'org.assertj:assertj-core:3.26.3'
 
     compileOnly 'org.projectlombok:lombok:1.18.34'
-    // compileOnly 'org.projectlombok:lombok:1.18.22'
+
+    // Clojure
+    implementation 'org.clojure:clojure:1.12.0'
+    implementation 'org.clojure:java.data:1.2.107'
+    testRuntimeOnly 'org.ajoberstar:jovial:0.3.0'
+    devImplementation 'org.clojure:tools.namespace:1.5.0'
+    // CIDER
+    devImplementation 'nrepl:nrepl:1.3.0'
+    devImplementation 'cider:cider-nrepl:0.50.2'
+    devImplementation 'org.clojure:tools.namespace:1.3.0'
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
 }
 
 def patchModuleArg = "--patch-module=jdk.compiler=" +
-    files(sourceSets.main.java.srcDirs, sourceSets.test.java.srcDirs).asPath
+        files(sourceSets.main.java.srcDirs, sourceSets.test.java.srcDirs).asPath
 
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs.addAll([
@@ -67,9 +86,9 @@ tasks.withType(JavaExec).configureEach {
 spotless {
     java {
         eclipse().configFile("${rootProject.projectDir}/eclipse-java-google-style.xml")
-        importOrder('','\\#')
-                   .wildcardsLast(false)
-                   .semanticSort()
+        importOrder('', '\\#')
+                .wildcardsLast(false)
+                .semanticSort()
         removeUnusedImports()
         formatAnnotations()
     }
@@ -77,15 +96,29 @@ spotless {
 
 checkerFramework {
     checkers = [
-        'org.checkerframework.checker.nullness.NullnessChecker'
+            'org.checkerframework.checker.nullness.NullnessChecker'
     ]
 }
 
-test {
+clojure {
+    builds {
+        main {
+            aotAll()
+        }
+    }
+}
+
+// test {
+//     useTestNG()
+//     maxHeapSize = '16G'
+// }
+
+tasks.withType(Test).configureEach {
     useTestNG()
-    maxHeapSize = '8G'
+    maxHeapSize = '16G'
 }
 
 wrapper {
-    gradleVersion = '7.3'
+//    gradleVersion = '7.3'
+    gradleVersion = '8.5'
 }

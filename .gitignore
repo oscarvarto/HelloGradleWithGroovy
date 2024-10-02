@@ -5,7 +5,7 @@ build/
 !**/src/test/**/build/
 
 ### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -38,6 +38,13 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+### Emacs ###
+.lsp
+
 ### Other ###
 .factorypath
 .mise.toml
+*tabnine*
+
+### Clojure ###
+.clj-kondo
